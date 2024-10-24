@@ -1,17 +1,39 @@
-# استخدام صورة PHP مع Apache
-FROM php:8.1-apache
+# Use the official PHP image with Apache
+FROM php:8.2-apache
 
-# تثبيت Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    zip \
+    unzip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd
 
-# نسخ ملفات التطبيق إلى الحاوية
+# Enable Apache Rewrite Module
+RUN a2enmod rewrite
+
+# Install Composer
+COPY --from=composer:2.5 /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy the existing application directory contents
 COPY . /var/www/html
 
-# تعيين أذونات
+# Install Laravel dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Copy Apache configuration
+COPY .docker/vhost.conf /etc/apache2/sites-available/000-default.conf
+
+# Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# تثبيت التبعيات
-RUN composer install --no-dev
+# Expose port 80
+EXPOSE 80
 
-# تعيين البيئة
-ENV APP_ENV=production
+# Start Apache server
+CMD ["apache2-foreground"]
